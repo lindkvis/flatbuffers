@@ -273,11 +273,12 @@ namespace grpc {
 template<class T> class SerializationTraits<flatbuffers::grpc::Message<T>> {
  public:
   static grpc::Status Serialize(const flatbuffers::grpc::Message<T> &msg,
-                                grpc_byte_buffer **buffer, bool *own_buffer) {
+                                ::grpc::ByteBuffer *cppBuffer, bool *own_buffer) {
     // We are passed in a `Message<T>`, which is a wrapper around a
     // `grpc_slice`. We extract it here using `BorrowSlice()`. The const cast
     // is necessary because the `grpc_raw_byte_buffer_create` func expects
     // non-const slices in order to increment their refcounts.
+    grpc_byte_buffer **buffer = reinterpret_cast<grpc_byte_buffer**>(cppBuffer);
     grpc_slice *slice = const_cast<grpc_slice *>(&msg.BorrowSlice());
     // Now use `grpc_raw_byte_buffer_create` to package the single slice into a
     // `grpc_byte_buffer`, incrementing the refcount in the process.
@@ -287,11 +288,13 @@ template<class T> class SerializationTraits<flatbuffers::grpc::Message<T>> {
   }
 
   // Deserialize by pulling the
-  static grpc::Status Deserialize(grpc_byte_buffer *buffer,
+  static grpc::Status Deserialize(::grpc::ByteBuffer *cppBuffer,
                                   flatbuffers::grpc::Message<T> *msg) {
-    if (!buffer) {
+    if (!cppBuffer) {
       return ::grpc::Status(::grpc::StatusCode::INTERNAL, "No payload");
     }
+    grpc_byte_buffer* buffer = reinterpret_cast<grpc_byte_buffer*>(cppBuffer);
+
     // Check if this is a single uncompressed slice.
     if ((buffer->type == GRPC_BB_RAW) &&
         (buffer->data.raw.compression == GRPC_COMPRESS_NONE) &&
